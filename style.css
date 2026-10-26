@@ -150,7 +150,7 @@ ul {
   margin: 0;
   padding: 0;
   overflow: hidden;
-  background-color: #333333;
+  background-color: #4e5c74;
 }
 
 ul li {
@@ -163,6 +163,8 @@ ul li a {
   text-align: center;
   padding: 14px 16px;
   text-decoration: none;
+  display: flex;
+  justify-content: center;
 }
 
 ul li a:hover {
