@@ -166,3 +166,11 @@ ul li a {
 ul li a:hover {
   background-color: #111111;
 }
+
+
+
+.secao neymar-secao {
+display: flex;
+justify-content: center;
+padding: 30px 20px;
+}
