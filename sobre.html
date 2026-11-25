@@ -37,46 +37,206 @@ Escola">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Animação de Texto</title>
+    <title>Animação de Texto com Java + HTML</title>
     <style>
-        body {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
+        * {
+            box-sizing: border-box;
             margin: 0;
-            background-color: #1a1a2e;
-            font-family: 'Courier New', Courier, monospace;
+            padding: 0;
         }
 
-        #texto-animado {
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, #0f172a, #1e293b, #0f172a);
+            color: #f8fafc;
+            padding: 20px;
+        }
+
+        .card {
+            background: rgba(30, 41, 59, 0.85);
+            border: 1px solid rgba(148, 163, 184, 0.2);
+            border-radius: 16px;
+            padding: 40px 32px;
+            max-width: 720px;
+            width: 100%;
+            text-align: center;
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.45);
+        }
+
+        .status {
+            display: inline-block;
+            font-size: 0.85rem;
+            padding: 6px 14px;
+            border-radius: 999px;
+            margin-bottom: 24px;
+            background: rgba(16, 185, 129, 0.15);
+            color: #34d399;
+            border: 1px solid rgba(52, 211, 153, 0.3);
+        }
+
+        .status.erro {
+            background: rgba(239, 68, 68, 0.15);
+            color: #f87171;
+            border-color: rgba(248, 113, 113, 0.3);
+        }
+
+        .palco {
+            min-height: 90px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 28px;
+        }
+
+        .texto-animado {
             font-size: 2rem;
-            color: #00ffcc;
-            border-right: 3px solid #00ffcc;
-            padding-right: 5px;
-            white-space: nowrap;
-            animation: piscar-cursor 0.7s infinite;
+            font-weight: 700;
+            white-space: pre-wrap;
+            background: linear-gradient(90deg, #38bdf8, #a78bfa, #f472b6, #38bdf8);
+            background-size: 200% auto;
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            animation: brilhar 4s linear infinite;
+            word-break: break-word;
         }
 
-        /* Animação do cursor piscando */
-        @keyframes piscar-cursor {
-            0%, 50% {
-                border-color: #00ffcc;
+        .cursor {
+            display: inline-block;
+            width: 3px;
+            height: 2rem;
+            background-color: #38bdf8;
+            margin-left: 4px;
+            vertical-align: middle;
+            animation: piscar 0.75s infinite;
+        }
+
+        @keyframes brilhar {
+            to {
+                background-position: 200% center;
             }
-            51%, 100% {
-                border-color: transparent;
-            }
+        }
+
+        @keyframes piscar {
+            0%, 49% { opacity: 1; }
+            50%, 100% { opacity: 0; }
+        }
+
+        .controles {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        input[type="text"] {
+            flex: 1;
+            min-width: 220px;
+            padding: 12px 16px;
+            border-radius: 10px;
+            border: 1px solid rgba(148, 163, 184, 0.3);
+            background: #0f172a;
+            color: #f8fafc;
+            font-size: 1rem;
+            outline: none;
+        }
+
+        input[type="text"]:focus {
+            border-color: #38bdf8;
+        }
+
+        button {
+            padding: 12px 22px;
+            border-radius: 10px;
+            border: none;
+            background: linear-gradient(90deg, #0284c7, #7c3aed);
+            color: #ffffff;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.15s ease, opacity 0.15s ease;
+        }
+
+        button:hover {
+            opacity: 0.92;
+            transform: translateY(-1px);
         }
     </style>
 </head>
 <body>
-    <span id="texto-animado"></span>
+    <div class="card">
+        <div id="status" class="status">Conectando ao servidor Java...</div>
 
-    <!-- Importa o arquivo JavaScript -->
-    <script src="animacao.js"></script>
+        <div class="palco">
+            <span id="texto" class="texto-animado"></span><span class="cursor"></span>
+        </div>
+
+        <form id="formulario" class="controles">
+            <input
+                type="text"
+                id="campoTexto"
+                maxlength="120"
+                placeholder="Digite uma frase para o Java animar..."
+            >
+            <button type="submit">Animar com Java</button>
+        </form>
+    </div>
+
+    <script>
+        const elementoTexto = document.getElementById("texto");
+        const elementoStatus = document.getElementById("status");
+        const formulario = document.getElementById("formulario");
+        const campoTexto = document.getElementById("campoTexto");
+
+        const hostJava = window.location.hostname === "127.0.0.1" ? "127.0.0.1" : "localhost";
+        const estaNoServidorJava =
+            (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") &&
+            window.location.port === "8080";
+        const urlBase = estaNoServidorJava ? "" : "http://" + hostJava + ":8080";
+
+        let fonteEventos = null;
+
+        function iniciarAnimacao(textoPersonalizado) {
+            if (fonteEventos) {
+                fonteEventos.close();
+            }
+
+            const url = textoPersonalizado
+                ? urlBase + "/animacao?texto=" + encodeURIComponent(textoPersonalizado)
+                : urlBase + "/animacao";
+
+            fonteEventos = new EventSource(url);
+
+            fonteEventos.onopen = function () {
+                elementoStatus.textContent = "Conectado ao servidor Java";
+                elementoStatus.className = "status";
+            };
+
+            fonteEventos.onmessage = function (evento) {
+                const dados = JSON.parse(evento.data);
+                elementoTexto.textContent = dados.texto;
+            };
+
+            fonteEventos.onerror = function () {
+                elementoStatus.textContent =
+                    "Servidor Java desconectado — execute ServidorAnimacao.java e mantenha aberto";
+                elementoStatus.className = "status erro";
+            };
+        }
+
+        formulario.addEventListener("submit", function (e) {
+            e.preventDefault();
+            iniciarAnimacao(campoTexto.value.trim());
+        });
+
+        iniciarAnimacao("");
+    </script>
 </body>
 </html>
-
 
 
 
