@@ -1,201 +1,146 @@
-import com.sun.net.httpserver.HttpExchange;
-import com.sun.net.httpserver.HttpHandler;
-import com.sun.net.httpserver.HttpServer;
+// ====== CONFIGURAÇÕES ======
+const FRASE_INICIAL = "Oi, dev! Brinque comigo";
+const CORES = ["#ffd166", "#ef476f", "#06d6a0", "#4cc9f0", "#f78c6b", "#c77dff"];
+const GRAVIDADE = 0.6;
+const QUICAR = 0.65;   // quanto da velocidade sobra ao bater
+const ATRITO = 0.99;
 
-import java.io.IOException;
-import java.io.OutputStream;
-import java.net.BindException;
-import java.net.InetSocketAddress;
-import java.net.URLDecoder;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.util.concurrent.Executors;
+const area = document.getElementById("area");
+const dev = document.getElementById("dev");
+const checkGravidade = document.getElementById("gravidade");
+let letras = [];
 
-public class ServidorAnimacao {
+function falar(msg) { dev.textContent = "Dev: " + msg; }
 
-    private static final int PORTA = 8080;
+// ====== CRIAR LETRAS ======
+function criarLetra(ch, x, y) {
+  const el = document.createElement("div");
+  el.className = "letra";
+  el.textContent = ch;
+  el.style.color = CORES[Math.floor(Math.random() * CORES.length)];
+  area.appendChild(el);
 
-    public static void main(String[] args) throws IOException {
-        HttpServer servidor;
-        try {
-            servidor = HttpServer.create(new InetSocketAddress(PORTA), 0);
-        } catch (BindException e) {
-            System.err.println("ERRO: A porta " + PORTA + " ja esta em uso por outro programa!");
-            System.err.println("Feche o outro programa ou mude PORTA no codigo Java.");
-            return;
-        }
+  const l = { el, x, y, vx: 0, vy: 0, w: el.offsetWidth, h: el.offsetHeight, pegada: false };
+  let offX = 0, offY = 0, inicioX = 0, inicioY = 0;
 
-        servidor.setExecutor(Executors.newCachedThreadPool());
+  el.addEventListener("pointerdown", (e) => {
+    l.pegada = true;
+    el.classList.add("pegada");
+    el.setPointerCapture(e.pointerId);
+    offX = e.clientX - l.x; offY = e.clientY - l.y;
+    inicioX = e.clientX; inicioY = e.clientY;
+    l.vx = 0; l.vy = 0;
+  });
 
-        // Rota principal: entrega o arquivo index.html
-        servidor.createContext("/", new HttpHandler() {
-            @Override
-            public void handle(HttpExchange exchange) throws IOException {
-                adicionarCors(exchange);
-                if ("OPTIONS".equalsIgnoreCase(exchange.getRequestMethod())) {
-                    exchange.sendResponseHeaders(204, -1);
-                    exchange.close();
-                    return;
-                }
+  el.addEventListener("pointermove", (e) => {
+    if (!l.pegada) return;
+    const nx = e.clientX - offX, ny = e.clientY - offY;
+    l.vx = nx - l.x;   // a velocidade vira o "arremesso" ao soltar
+    l.vy = ny - l.y;
+    l.x = nx; l.y = ny;
+  });
 
-                String caminho = exchange.getRequestURI().getPath();
-                if (!"/".equals(caminho) && !"/index.html".equals(caminho)) {
-                    byte[] msg = "404 - Nao encontrado".getBytes(StandardCharsets.UTF_8);
-                    exchange.sendResponseHeaders(404, msg.length);
-                    try (OutputStream os = exchange.getResponseBody()) {
-                        os.write(msg);
-                    }
-                    return;
-                }
-
-                Path arquivoHtml = localizarHtml();
-                if (arquivoHtml == null) {
-                    byte[] erro = ("Arquivo index.html nao encontrado na pasta: "
-                            + Paths.get("").toAbsolutePath())
-                            .getBytes(StandardCharsets.UTF_8);
-                    exchange.getResponseHeaders().set("Content-Type", "text/plain; charset=UTF-8");
-                    exchange.sendResponseHeaders(404, erro.length);
-                    try (OutputStream os = exchange.getResponseBody()) {
-                        os.write(erro);
-                    }
-                    return;
-                }
-
-                byte[] htmlBytes = Files.readAllBytes(arquivoHtml);
-                exchange.getResponseHeaders().set("Content-Type", "text/html; charset=UTF-8");
-                exchange.sendResponseHeaders(200, htmlBytes.length);
-                try (OutputStream os = exchange.getResponseBody()) {
-                    os.write(htmlBytes);
-                }
-            }
-        });
-
-        // Rota de streaming (SSE): o Java controla e envia a animacao de texto
-        servidor.createContext("/animacao", new HttpHandler() {
-            @Override
-            public void handle(HttpExchange exchange) throws IOException {
-                adicionarCors(exchange);
-                if ("OPTIONS".equalsIgnoreCase(exchange.getRequestMethod())) {
-                    exchange.sendResponseHeaders(204, -1);
-                    exchange.close();
-                    return;
-                }
-
-                String texto = extrairParametroTexto(exchange.getRequestURI().getRawQuery());
-                if (texto == null || texto.trim().isEmpty()) {
-                    texto = "Anima\u00e7\u00e3o de texto controlada pelo Java!";
-                }
-                if (texto.codePointCount(0, texto.length()) > 200) {
-                    texto = texto.substring(0, texto.offsetByCodePoints(0, 200));
-                }
-
-                exchange.getResponseHeaders().set("Content-Type", "text/event-stream; charset=UTF-8");
-                exchange.getResponseHeaders().set("Cache-Control", "no-cache, no-transform");
-                exchange.getResponseHeaders().set("X-Accel-Buffering", "no");
-                exchange.sendResponseHeaders(200, 0);
-
-                try (OutputStream os = exchange.getResponseBody()) {
-                    os.write("retry: 2000\n\n".getBytes(StandardCharsets.UTF_8));
-                    os.flush();
-
-                    while (true) {
-                        int i = 0;
-                        while (i < texto.length()) {
-                            int proximo = texto.offsetByCodePoints(i, 1);
-                            enviarEvento(os, texto.substring(0, proximo));
-                            Thread.sleep(90);
-                            i = proximo;
-                        }
-
-                        Thread.sleep(1500);
-
-                        i = texto.length();
-                        while (i > 0) {
-                            int anterior = texto.offsetByCodePoints(i, -1);
-                            enviarEvento(os, texto.substring(0, anterior));
-                            Thread.sleep(45);
-                            i = anterior;
-                        }
-
-                        Thread.sleep(400);
-                    }
-                } catch (IOException | InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                }
-            }
-        });
-
-        servidor.start();
-        System.out.println("Servidor Java iniciado com sucesso!");
-        System.out.println("Acesse no navegador: http://localhost:" + PORTA);
-        System.out.println("Mantenha este terminal aberto enquanto usa a pagina.");
+  const soltar = (e) => {
+    if (!l.pegada) return;
+    l.pegada = false;
+    el.classList.remove("pegada");
+    const moveu = Math.hypot(e.clientX - inicioX, e.clientY - inicioY);
+    if (moveu < 4) {              // só um clique: dá um pulinho
+      l.vy = -14;
+      l.vx = (Math.random() - 0.5) * 10;
+      falar("Ei, isso faz cócegas!");
+    } else if (Math.hypot(l.vx, l.vy) > 25) {
+      falar("Que arremesso!");
     }
+  };
+  el.addEventListener("pointerup", soltar);
+  el.addEventListener("pointercancel", soltar);
 
-    private static Path localizarHtml() {
-        String[] caminhos = {
-            "index.html",
-            "src/index.html",
-            "src/main/resources/index.html",
-            "public/index.html"
-        };
-        for (String c : caminhos) {
-            Path p = Paths.get(c);
-            if (Files.exists(p)) {
-                return p;
-            }
-        }
-        return null;
-    }
-
-    private static void adicionarCors(HttpExchange exchange) {
-        exchange.getResponseHeaders().set("Access-Control-Allow-Origin", "*");
-        exchange.getResponseHeaders().set("Access-Control-Allow-Methods", "GET, OPTIONS");
-        exchange.getResponseHeaders().set("Access-Control-Allow-Headers", "*");
-    }
-
-    private static void enviarEvento(OutputStream os, String texto) throws IOException {
-        String json = "{\"texto\":\"" + escaparJson(texto) + "\"}";
-        String evento = "data: " + json + "\n\n";
-        os.write(evento.getBytes(StandardCharsets.UTF_8));
-        os.flush();
-    }
-
-    private static String extrairParametroTexto(String query) {
-        if (query == null || query.isEmpty()) {
-            return null;
-        }
-        String[] pares = query.split("&");
-        for (String par : pares) {
-            int idx = par.indexOf('=');
-            if (idx > 0) {
-                String chave = par.substring(0, idx);
-                if ("texto".equals(chave)) {
-                    try {
-                        return URLDecoder.decode(par.substring(idx + 1), "UTF-8");
-                    } catch (Exception e) {
-                        return null;
-                    }
-                }
-            }
-        }
-        return null;
-    }
-
-    private static String escaparJson(String s) {
-        StringBuilder sb = new StringBuilder();
-        for (int i = 0; i < s.length(); i++) {
-            char c = s.charAt(i);
-            switch (c) {
-                case '"': sb.append("\\\""); break;
-                case '\\': sb.append("\\\\"); break;
-                case '\n': sb.append("\\n"); break;
-                case '\r': sb.append("\\r"); break;
-                case '\t': sb.append("\\t"); break;
-                default: sb.append(c);
-            }
-        }
-        return sb.toString();
-    }
+  letras.push(l);
+  return l;
 }
+
+function criarPalavra(texto, xInicial, y) {
+  let x = xInicial;
+  for (const ch of texto) {
+    if (ch === " ") { x += 24; continue; }
+    const l = criarLetra(ch, x, y);
+    x += l.w + 4;
+  }
+}
+
+function iniciar() {
+  letras.forEach((l) => l.el.remove());
+  letras = [];
+  const largura = Math.min(window.innerWidth - 40, 700);
+  const palavras = FRASE_INICIAL.split(" ");
+  let x = 20, y = 90;
+  for (const p of palavras) {
+    const larguraPalavra = p.length * 40;
+    if (x + larguraPalavra > largura) { x = 20; y += 70; }
+    criarPalavra(p, x, y);
+    x += larguraPalavra + 24;
+  }
+  falar("Pegue as letras, arraste e solte!");
+}
+
+// ====== LOOP DE FÍSICA ======
+function atualizar() {
+  const W = window.innerWidth, H = window.innerHeight;
+  const g = checkGravidade.checked ? GRAVIDADE : 0;
+
+  for (const l of letras) {
+    if (l.pegada) {
+      l.vx *= 0.8; l.vy *= 0.8;  // se parar de mexer, o arremesso some
+    } else {
+      l.vy += g;
+      l.vx *= ATRITO;
+      l.vy *= g ? 0.999 : ATRITO;
+      l.x += l.vx;
+      l.y += l.vy;
+    }
+
+    // paredes, teto e chão
+    if (l.x < 0)          { l.x = 0;          l.vx *= -QUICAR; }
+    if (l.x + l.w > W)    { l.x = W - l.w;    l.vx *= -QUICAR; }
+    if (l.y < 0)          { l.y = 0;          l.vy *= -QUICAR; }
+    if (l.y + l.h > H)    {
+      l.y = H - l.h;
+      l.vy *= -QUICAR;
+      l.vx *= 0.95;                       // atrito no chão
+      if (Math.abs(l.vy) < 1.5) l.vy = 0;  // para de quicar
+    }
+    l.el.style.transform = `translate(${l.x}px, ${l.y}px)`;
+  }
+  requestAnimationFrame(atualizar);
+}
+
+// ====== BOTÕES ======
+function soltarPalavra() {
+  const campo = document.getElementById("entrada");
+  const texto = campo.value.trim();
+  if (!texto) { falar("Digite uma palavra primeiro."); campo.focus(); return; }
+  const x = Math.random() * Math.max(20, window.innerWidth - texto.length * 45);
+  criarPalavra(texto, x, 70);
+  campo.value = "";
+  falar(`Lá vai "${texto}"!`);
+}
+
+document.getElementById("soltar").addEventListener("click", soltarPalavra);
+document.getElementById("entrada").addEventListener("keydown", (e) => {
+  if (e.key === "Enter") soltarPalavra();
+});
+document.getElementById("sacudir").addEventListener("click", () => {
+  letras.forEach((l) => {
+    l.vx = (Math.random() - 0.5) * 40;
+    l.vy = -Math.random() * 30;
+  });
+  falar("Terremoto!");
+});
+document.getElementById("reiniciar").addEventListener("click", iniciar);
+checkGravidade.addEventListener("change", () => {
+  falar(checkGravidade.checked ? "A gravidade voltou." : "Agora estamos flutuando...");
+});
+
+iniciar();
+atualizar();

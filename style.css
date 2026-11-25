@@ -547,3 +547,92 @@ kbd {
   font-size: 12px;
   color: var(--dim);
 }
+
+
+
+
+
+
+
+
+
+
+
+
+:root {
+  --fundo: #1c2541;
+  --barra: #0b132b;
+  --texto: #f4f1de;
+  --destaque: #ffd166;
+}
+* { box-sizing: border-box; }
+html, body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: var(--fundo);
+  color: var(--texto);
+  font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+}
+#barra {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  z-index: 10;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  padding: 10px 14px;
+  background: var(--barra);
+}
+#barra input[type="text"] {
+  flex: 1 1 160px;
+  min-width: 0;
+  padding: 8px 10px;
+  border: 2px solid #3a506b;
+  border-radius: 8px;
+  background: #1c2541;
+  color: var(--texto);
+  font: inherit;
+}
+button {
+  padding: 8px 12px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--destaque);
+  color: #1c2541;
+  font: inherit;
+  font-weight: bold;
+  cursor: pointer;
+}
+button:hover { filter: brightness(1.1); }
+button:focus-visible, input:focus-visible {
+  outline: 3px solid #fff;
+  outline-offset: 2px;
+}
+label { display: flex; align-items: center; gap: 6px; cursor: pointer; }
+#dev {
+  position: fixed;
+  left: 50%;
+  bottom: 16px;
+  transform: translateX(-50%);
+  max-width: 90vw;
+  padding: 8px 14px;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.1);
+  pointer-events: none;
+  text-align: center;
+}
+#area { position: fixed; inset: 0; }
+.letra {
+  position: absolute;
+  left: 0; top: 0;
+  font-size: 3rem;
+  font-weight: 900;
+  line-height: 1;
+  cursor: grab;
+  user-select: none;
+  touch-action: none;
+  will-change: transform;
+}
+.letra.pegada { cursor: grabbing; z-index: 5; filter: drop-shadow(0 6px 6px rgba(0,0,0,.4)); }
